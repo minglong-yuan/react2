@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import "@aws-amplify/ui-react/styles.css";
 import { generateClient } from 'aws-amplify/api';
+import { getUrl, uploadData,remove } from 'aws-amplify/storage';
 import { API, Storage } from 'aws-amplify';
 import {
 	  Button,
@@ -29,13 +30,14 @@ const App = ({ signOut }) => {
 		    }, []);
 
 	  async function fetchNotes() {
-		    const apiData = await API.graphql({ query: listNotes });
+		    const apiData = await client.graphql({ query: listNotes });
 		    const notesFromAPI = apiData.data.listNotes.items;
 		    await Promise.all(
 			        notesFromAPI.map(async (note) => {
 					      if (note.image) {
-						              const url = await Storage.get(note.name);
-						              note.image = url;
+						              const url = await getUrl({key:note.name});
+										console.log(url);
+						              note.image = url.url.href;
 						            }
 					      return note;
 					    })
@@ -46,14 +48,22 @@ const App = ({ signOut }) => {
 	  async function createNote(event) {
 		    event.preventDefault();
 		    const form = new FormData(event.target);
+		    console.log(form);
+		    
 		    const image = form.get("image");
+		    console.log(image);
 		    const data = {
 			        name: form.get("name"),
 			        description: form.get("description"),
 			        image: image.name,
 			      };
-		    if (!!data.image) await Storage.put(data.name, image);
-		    await API.graphql({
+			console.log(data);
+		    if (!!data.image) await uploadData({
+			      key: data.name,
+			      data: image,
+		
+		    });
+		    await client.graphql({
 			        query: createNoteMutation,
 			        variables: { input: data },
 			      });
@@ -65,8 +75,8 @@ const App = ({ signOut }) => {
 	  async function deleteNote({ id, name }) {
 		    const newNotes = notes.filter((note) => note.id !== id);
 		    setNotes(newNotes);
-		    await Storage.remove(name);
-		    await API.graphql({
+		    await remove({key:name});
+		    await client.graphql({
 			        query: deleteNoteMutation,
 			        variables: { input: { id } },
 			      });
